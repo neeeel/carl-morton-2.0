@@ -28,7 +28,6 @@ class ClientSocket(threading.Thread):
                     length_as_string = "0" + str(length)
                 else:
                     length_as_string = str(length)
-                #print("length of message string is " + length_as_string)
                 if not self.clientSocket == None:
                     try:
                         self.clientSocket.send(length_as_string.encode())
@@ -39,9 +38,7 @@ class ClientSocket(threading.Thread):
                         self.w.setClientMessage("Not Connected","red")
                         return
                     try:
-                        #print("trying to send " , msg)
                         self.clientSocket.send(msg.encode())
-                        #print("sent message ", msg)
                     except Exception as e:
                         print("failed to send message string ", type(e))
                         self.clientSocket.close()
@@ -56,7 +53,6 @@ class ClientSocket(threading.Thread):
                     return
                 del (self.messageQueue[0])
             if time.time()*1000 - self.lastPing*1000 > 5000:
-                #print(time.time(),self.lastPing)
                 self.lastPing = time.time()
                 self.addToQueue("PING")
             if time.time()*1000 - self.lastMarketCheck*1000 > 1000:
@@ -76,11 +72,7 @@ class ClientSocket(threading.Thread):
         try:
             print("trying to connect to " + str(ip_address))
             self.clientSocket.connect((str(ip_address), 5554))
-            #clientStatusLabel.configure(text="Connected", fg="green")
-            #sync_market()
         except Exception as e:
-            # print(e.__class__)
-            # print(type(e))
             print("failed to connect to server , ", type(e))
             self.clientSocket.close()
             self.isOpen = False
