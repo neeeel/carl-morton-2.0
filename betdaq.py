@@ -40,7 +40,7 @@ class betdaqManager():
         fh.write(msg)
         fh.close
 
-
+#test
 #bd = betdaqManager()
 #ba = win32com.client.Dispatch("BettingAssistantCom.Application.ComClass")
 #print(ba.marketname)
