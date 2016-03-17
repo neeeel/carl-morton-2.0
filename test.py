@@ -2,6 +2,7 @@ __author__ = 'neil'
 
 import window,texttospeech,decimal,betthread,time,myserversocket,threading,clientsocket
 import win32com.client,inputbox
+import logging
 
 
 def get_IP():
@@ -14,21 +15,21 @@ def keyPress(event):
     global highLow,fav,repeat,selection,w,selectedClothNo
     keymap = w.getKeyMap()
     key = str(event.char)
-    print( "pressed", repr(event.char))
+
     print (w.getEdit())
     if clientSocket == None:
         return
     w.disableEntries()
     print(key)
     if key in keymap.keys():
-        print("YES ",key,keymap[key])
+        logging.info( "On client,pressed %s which is key %s in the keymap"  ,repr(event.char),keymap[key])
         if keymap[key] == "0": #fav selected
             sel = rank_runners(1)
             if len(sel) == 0:
                 return
             selection = sel[0]
             selectedClothNo = ba.getsaddlecloth(selection)
-            print("fav set to ",selection)
+            logging.info("fav key pressed, selection set to %s , cloth no set to %i",selection,selectedClothNo)
             tts.keyPressed(keymap[key],selectedClothNo)
         if keymap[key] == "1": #second fav selected
             sel = rank_runners(2)
@@ -36,15 +37,13 @@ def keyPress(event):
                 return
             selection = sel[0]
             selectedClothNo = ba.getsaddlecloth(selection)
-            print("fav set to ",fav)
+            logging.info("2nd fav key pressed, selection set to %s, cloth no set to %i",selection,selectedClothNo)
             tts.keyPressed(keymap[key],selectedClothNo)
         if int(keymap[key]) >=2 and int(keymap[key]) <=4: #BACK BETS
             if selectedClothNo == 0:
                 return
             bet = int(keymap[key]) -2 # bet is keeping track of whether the bet is Back 1, Back 2, or Back3, 0 is back1, 1 is back2 ,etc
-            print("bet pressed was ",bet)
             betSettings = w.getClientBetSettings()
-            #print("bet settings" ,betSettings)
             selection = getNameFromSaddlecloth(selectedClothNo)
             odds = float(betSettings[bet *2])
             stake = float(betSettings[(bet *2) +1])
@@ -54,13 +53,12 @@ def keyPress(event):
                 fillOrKill = 0
             my_bet_thread.add_bet(selection,odds,stake,fillOrKill,"B")
             msg = "horse:" + str(selection + "," + str(odds) + "," + str(stake) + "," +str("B") + "," + str(bet))
-            print("trying to send bet to remote server " , msg)
+            logging.info("trying to send bet to remote server %s " , msg)
             clientSocket.addToQueue(msg)
         if int(keymap[key]) >=5 and int(keymap[key]) <=7: # LAY BETS
             if selectedClothNo == 0:
                 return
             bet = int(keymap[key]) -2 # bet is keeping track of whehter the bet is Lay 1, Lay 2, or Lay 3
-            print("bet pressed was ",bet)
             betSettings = w.getClientBetSettings()
             selection = getNameFromSaddlecloth(selectedClothNo)
             odds = float(betSettings[bet *2])
@@ -72,7 +70,7 @@ def keyPress(event):
                 fillOrKill = 0
             my_bet_thread.add_bet(selection,odds,stake,fillOrKill,"L")
             msg = "horse:" + str(selection + "," + str(odds) + "," + str(stake) + "," +str("L") + "," + str(bet))
-            print("trying to send bet to remote server " , msg)
+            logging.info("trying to send bet to remote server %s" , msg)
             clientSocket.addToQueue(msg)
         if int(keymap[key]) ==8:
             tts.speakCurrentPrice()
@@ -80,9 +78,11 @@ def keyPress(event):
             speakProfit()
         if int(keymap[key]) ==10:
             incrementClothNo()
+            logging.info("incremented cloth no to %i",selectedClothNo)
             tts.keyPressed(keymap[key],selectedClothNo)
         if int(keymap[key]) ==11:
             decrementClothNo()
+            logging.info("decremented cloth no to %i ",selectedClothNo)
             tts.keyPressed(keymap[key],selectedClothNo)
 
 def monitorMarketChange():
@@ -92,7 +92,7 @@ def monitorMarketChange():
         #print(str(m) + " " +  str(current_market))
         if m !=current_market:
             selectedClothNo = 0
-            print("market change detected in monitorMarketChange")
+            logging.info("market change detected in monitorMarketChange, new market is %l",m)
             tts.reset()
             current_market = ba.marketid
         time.sleep(1)
@@ -176,13 +176,16 @@ def rank_runners(rnk):
 
 def on_closing():
     global local_bet_thread_flag,ip_address,botOn,tts
-    print("window close event detected")
+    logging.info("window closed, shutting down all threads and services")
     if clientSocket != None:
         clientSocket.stop_client()
+        logging.info("Stopping client thread")
     botOn = False
     w.saveSettings(ip_address)
     my_bet_thread.close()
+    logging.info("Stopping bet thread")
     stop_server()
+    logging.info("Stopping server thread")
     if tts !=None:
         tts.kill()
     w.destroy()
@@ -190,15 +193,18 @@ def on_closing():
 def start_server():
     #statuslabel.configure(text="Listening", fg="green")
     global serversocket, my_bet_thread,w
+    logging.info("Starting up server")
     serversocket = myserversocket.myServerSocket(my_bet_thread)
     serversocket.setWindow(w)
     serversocket.bind(('', 5554))
     serversocket.listen(5)
+    logging.info("Server listening")
 
 def stop_server():
     global server_thread, server_started
     global serversocket
     server_started = False
+    logging.info("Stopping server")
     if serversocket is None:
         print("server not connected")
     else:
@@ -207,9 +213,8 @@ def stop_server():
         serversocket = None
         if not server_thread is None:
             server_thread.join()
-            # print(server_thread.is_alive())
-            # print("TEW")
             server_thread = None
+    logging.info("Server stopped")
 
 def temp():
     global server_started
@@ -244,15 +249,19 @@ def speakPrice():
 
 def start_client():
     global ip_address,clientSocket,w,botOn,fav, selection,tts,selectedClothNo
+
     print("is client socket set to NONE " ,clientSocket == None)
     if clientSocket != None:
         print("is client socket alive? " ,clientSocket.isAlive())
         if not clientSocket.isAlive():
             clientSocket  = None
     if not botOn:
+        logging.info("Starting up client")
         if clientSocket == None:
             tts = texttospeech.TTS()
+            logging.info("Started tts thread")
             clientSocket = clientsocket.ClientSocket()
+            logging.info("started client socket")
             clientSocket.setWindow(w)
             clientSocket.start_client(ip_address)
             botOn = True
@@ -268,6 +277,7 @@ def stop_client():
     botOn = False
     selectedClothNo = 0
     if clientSocket != None:
+        logging.info("Client stopped")
         clientSocket.stop_client()
         clientSocket = None
         w.enableEntries()
@@ -294,6 +304,7 @@ serversocket = None
 clientSocket = None
 repeat = None
 tts = None
+logging.basicConfig(level=logging.INFO,filename = "log.txt",format='%(asctime)s %(message)s' , datefmt='%m/%d/%Y %I:%M:%S %p')
 ba = win32com.client.Dispatch("BettingAssistantCom.Application.ComClass")
 w = window.Window()
 current_market = ba.marketid

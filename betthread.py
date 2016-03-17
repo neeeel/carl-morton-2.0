@@ -2,6 +2,7 @@ __author__ = 'neil'
 
 import threading
 import time,win32com
+import logging
 
 class betThread(object):
 
@@ -17,11 +18,10 @@ class betThread(object):
 
     def add_bet(self,horse,odds,stake,fillOrKill,betType):
         self.lock.acquire()
-        print("add bet aquired lock")
         self.betQueue.append((horse,odds,stake,fillOrKill,betType))
-        print("betthread received bet",betType,horse, odds, stake,self.betQueue)
+        msg = str(betType)+ " " +  str(horse) + " " + str(odds) + " " + str(stake)
+        logging.info("betthread: received bet %s",msg)
         self.lock.release()
-        print("add bet released lock")
 
 
     def process(self):
@@ -34,13 +34,15 @@ class betThread(object):
             #print("process acquired lock")
             #print("bet queue length",len(self.betQueue))
             while len(self.betQueue) > 0:
-                print("before popping, bet queue was",self.betQueue)
+                #logging.info("Betthread: processing bets, bet queue is %s", ",".join(self.betQueue))
                 bet = self.betQueue.pop(0)
-                print("processing",bet,self.betQueue)
+                #logging.info("Betthread: processing",bet)
                 index = self.get_index(bet[0])
                 if index != -1:
                     result = self.ba.placebet(index,bet[4],bet[1],bet[2])
-                    print(" in bet thread, placing bet ",bet[0], bet[1],bet[2],self.betQueue)
+                    msg = str(index) + " " + str(bet[0]) + " " +  str(bet[4]) + " " + str(bet[1]) + " " + str(bet[2])
+                    logging.info("Betthread: placing bet %s",msg)
+                    logging.info("Betthread: bet id was %s",str(result))
                     fillOrKill = int(bet[3])
                     self.bets.append((result,time.time(),fillOrKill))
                     #print("in bet thread, removing bet ",bet,self.betQueue)
@@ -53,7 +55,7 @@ class betThread(object):
             count= 0
             for b in self.bets:
                 if curr_time - float(b[1]) >= int(b[2]):
-                    print("in betThread, cancelling " + str(b[0]))
+                    logging.info("Betthread: cancelling bet " + str(b[0]))
                     self.ba.cancelbet(b[0])
                     del self.bets[count]
                 count+=1

@@ -1,6 +1,7 @@
 __author__ = 'neil'
 
 import socket,threading,time,win32com
+import logging
 
 class ClientSocket(threading.Thread):
 
