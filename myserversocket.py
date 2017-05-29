@@ -12,7 +12,7 @@ import logging
 class myServerSocket(socket.socket):
     def __init__(self,betThread):
         pythoncom.CoInitialize()
-        self.ba = win32com.client.Dispatch("BettingAssistantCom.Application.ComClass")
+        self.ba =win32com.client.dynamic.Dispatch("BettingAssistantCom.Application.ComClass")
         self.clients = []
         super(myServerSocket, self).__init__(socket.AF_INET, socket.SOCK_STREAM)
         self.index  = -1
@@ -50,6 +50,7 @@ class myServerSocket(socket.socket):
         for c in self.clients:
             c.close()
 
+
         self.w.setServerMessage("Not Listening","red")
 
     def isAlive(self):
@@ -77,6 +78,8 @@ class myServerSocket(socket.socket):
                     client = None
                     return
                 length = str(data.decode())
+                MSGLEN = int(length)
+                #print(MSGLEN,length)
             except ConnectionResetError as e:
                 logging.info("connection forcibly closed by client ")
                 client.close()
@@ -97,10 +100,15 @@ class myServerSocket(socket.socket):
                 client.close()
                 client = None
                 return
+            except ValueError as e:
+                logging.info("Server: Error converting length of next message to an int, received length was ", str(length))
+                client.close()
+                client = None
+                return
             if length == '':
                 return
 
-            MSGLEN = int(length)
+
             chunks = []
             received = 0
             while received < MSGLEN:
@@ -133,7 +141,7 @@ class myServerSocket(socket.socket):
                 logging.info("Server: message received from client %s",msg)
                 logging.info("Server: received change market message, new market is" + str(msg[1]))
                 if self.currentmarket != str(msg[1]):
-                    #self.ba.openmarket(msg[1],1)
+                    self.ba.openmarket(msg[1],1)
                     self.currentmarket = str(msg[1])
                 if self.currentBetdaqMarket != str(msg[2]):
                     self.bd.changeMarket(str(msg[2]))

@@ -1,6 +1,7 @@
 __author__ = 'neil'
 import win32com.client,threading,betthread,time
 import window
+import logging
 
 def incrementClothNo(selection):
     global ba
@@ -22,14 +23,11 @@ def temp():
     count = 0
     while True:
         time.sleep(1)
-        betThread.add_bet("w",count,2,5,"B")
-        count+=1
+        logging.info(time.time())
 
-
+logging.basicConfig(level=logging.INFO,filename = "log.txt")
 betThread = betthread.betThread()
 t = threading.Thread(target = temp)
 t.start()
 time.sleep(0.01)
-t = threading.Thread(target = temp)
-t.start()
 

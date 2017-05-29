@@ -21,7 +21,7 @@ class TTS(object):
         self.keyPressedAt = time.time()
         self.lastSpokeAt = time.time()
         self.active = True
-        self.ba = win32com.client.Dispatch("BettingAssistantCom.Application.ComClass")
+        self.ba =win32com.client.dynamic.Dispatch("BettingAssistantCom.Application.ComClass")
         self.lastKeyPressed = ""
         self.t = threading.Thread(target = self.run)
         self.t.start()
@@ -58,6 +58,10 @@ class TTS(object):
             if cloth == clothNo:
                 return p.selection
         return ""
+
+    def change_selection_via_speech(self,clothNo):
+        self.selectionChanged = True
+        self.clothNo = clothNo
 
     def run(self):
         while self.active == True:

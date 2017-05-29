@@ -7,7 +7,7 @@ import logging
 class betThread(object):
 
     def __init__(self):
-        self.ba = win32com.client.Dispatch("BettingAssistantCom.Application.ComClass")
+        self.ba =win32com.client.dynamic.Dispatch("BettingAssistantCom.Application.ComClass")
         self.bets = []
         self.betQueue = []
         self.currentMarketID = ""

@@ -17,7 +17,7 @@ class ClientSocket(threading.Thread):
 
     def __init__(self):
         super().__init__()
-        self.ba = win32com.client.Dispatch("BettingAssistantCom.Application.ComClass")
+        self.ba =win32com.client.dynamic.Dispatch("BettingAssistantCom.Application.ComClass")
 
     def run(self):
         self.w.setClientMessage("Connected","green")

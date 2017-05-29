@@ -2,7 +2,9 @@ __author__ = 'neil'
 
 from tkinter import *
 from tkinter import ttk
+from tkinter import font
 import threading
+import speechrecognition
 
 
 class Window(Tk):
@@ -11,25 +13,39 @@ class Window(Tk):
         self.note = ttk.Notebook(self)
         self.tab1 = Frame(self.note)
         self.tab2 = Frame(self.note)
+        self.tab3 = Frame(self.note)
         self.clientEntryValues = []
         self.serverEntryValues = []
         self.messageLabel = None
         self.edit = IntVar()
         self.buildClient()
         self.buildServer()
+        self.loadSettings()
+        self.build_mic_settings()
         self.note.add(self.tab1, text = "Settings")
         self.note.add(self.tab2, text = "Client")
+        self.note.add(self.tab3, text = "Mic Settings")
         self.note.bind_all("<<NotebookTabChanged>>", self.tabChanged)
         self.note.pack()
-        self.loadSettings()
+        #self.loadSettings()
         self.note.select(1)
+        self.micTestFlag = False
+        self.clientRunning = False ### indicates that the client is running, so that if we are on the mic settings, we dont consume any saddlecloth numbers
 
+
+    def client_running(self,val):
+        self.clientRunning = val
 
     def tabChanged(self,event):
         if self.note.index(self.note.select()) == 0:
-            pass
+            self.micTestFlag = False
         if self.note.index(self.note.select()) == 1:
             self.hideSettings()
+            self.micTestFlag = False
+            speechrecognition.clear_saddlecloth_queue()
+        if self.note.index(self.note.select()) == 2:
+            self.hideSettings()
+            self.toggle_mic_test()
 
     def buildServer(self):
         startButton = Button(self.tab1,text = "Listen",command = self.getIncrements )
@@ -157,6 +173,79 @@ class Window(Tk):
         self.tab2.pack()
         print (len(self.clientEntryValues))
 
+    def build_mic_settings(self):
+        f = font.Font(family="Times New Roman", size=30,weight="bold")
+        settings = speechrecognition.get_recogniser_settings()
+        print("settings are")
+        Label(self.tab3,text="Vol. Threshold").grid(row=0,column=0)
+        w = Scale(self.tab3, from_=0, to=1000, orient=HORIZONTAL,resolution = 10,length = 250)
+        w.grid(row=0,column=1)
+        w.set(settings[0])
+        print("setting 0",w.get())
+        w.config(command= lambda x:self.mic_settings_changed(x,1))
+        Label(self.tab3,text="End Of Phrase Quiet Length").grid(row=1,column=0)
+        w = Scale(self.tab3, from_=0, to=1, orient=HORIZONTAL,resolution = 0.01,length = 250)
+        w.grid(row=1,column=1)
+        w.set(settings[1])
+        print("setting 1",w.get())
+        w.config(command= lambda x:self.mic_settings_changed(x,2))
+        Label(self.tab3,text="Min Audio Length").grid(row=2,column=0)
+        w = Scale(self.tab3, from_=0, to=1, orient=HORIZONTAL,resolution = 0.01,length = 250)
+        w.grid(row=2,column=1)
+        w.set(settings[2])
+        print("setting 2",w.get())
+        w.config(command= lambda x:self.mic_settings_changed(x,3))
+        Button(self.tab3,text="Test",command=self.toggle_mic_test).grid(row=3,column=0,columnspan=2)
+        self.resultLabel = Label(self.tab3,text="0",relief=GROOVE,borderwidth=2,font =f)
+        s = ttk.Style()
+        s.theme_use('clam')
+        s.configure("red.Horizontal.TProgressbar", foreground='red', background='red')
+        self.pb = ttk.Progressbar(self.tab3, style="red.Horizontal.TProgressbar", orient="horizontal", length=200)
+        self.pb["maximum"]= 600
+        self.pb.grid(row=5,column=0,columnspan = 2)
+
+        self.resultLabel.grid(row=4,column=0,columnspan=2)
+
+    def mic_settings_changed(self,event,index):
+        print(event,index)
+        settings = []
+        #if index == 1:
+            #self.pb["maximum"] = 2 * event
+        for child in self.tab3.winfo_children():
+            if type(child)== Scale:
+                print(child.get())
+                settings.append(child.get())
+        speechrecognition.set_recogniser_settings(settings)
+        self.saveSettings(self.ip_address)
+
+    def toggle_mic_test(self):
+        if self.micTestFlag == False:
+            self.micTestFlag = True
+            self.mic_test()
+        else:
+            self.micTestFlag = False
+
+    def mic_test(self):
+        if self.micTestFlag == True:
+            consume = True
+            #print(speechrecognition.get_microphone_energy())
+            energy = speechrecognition.get_microphone_energy()
+            s = ttk.Style()
+            s.theme_use('clam')
+            if energy > self.tab3.winfo_children()[1].get():
+                s.configure("red.Horizontal.TProgressbar", foreground='green', background='green')
+            else:
+                s.configure("red.Horizontal.TProgressbar", foreground='red', background='red')
+            if self.clientRunning == True:
+                consume = False
+            self.pb["value"] = energy
+            next = speechrecognition.get_next_saddlecloth_selection(consume=consume)
+
+            if next != "":
+                print("next is",next)
+                self.resultLabel.config(text=next)
+            self.after(100,self.mic_test)
+
     def getClientBetSettings(self):
         l = []
         for i in range(0,25):
@@ -176,6 +265,7 @@ class Window(Tk):
         l.append(self.clientEntryValues[24].get())
         print(l)
         return l
+
     def getEdit(self):
         return self.edit.get()
 
@@ -189,8 +279,11 @@ class Window(Tk):
                 print("read",text)
                 e.set(text)
                 count += 1
-            ip_address = f.readline().replace("\n", "")
-            print("read ip add as " + ip_address)
+            self.ip_address = f.readline().replace("\n", "")
+            recognizer_settings = [float(f.readline().replace("\n", "")) for i in range(3)]
+            print("recognizer settins are",recognizer_settings)
+            speechrecognition.set_recogniser_settings(recognizer_settings)
+            print("read ip add as " + self.ip_address)
         with open('serversettings.txt', 'r') as f:
             count = 0
             for e in self.serverEntryValues:
@@ -198,7 +291,7 @@ class Window(Tk):
                 text = text.replace("\n", "")
                 print("read",text)
                 e.set(text)
-        return ip_address
+        return self.ip_address
 
     def saveSettings(self,ip_address):
         with open('settings.txt', 'w') as f:
@@ -208,6 +301,9 @@ class Window(Tk):
                 else:
                     f.write(e.get() + "\n")
             f.write(ip_address+ "\n")
+            for v in speechrecognition.get_recogniser_settings():
+                f.write(str(v) + "\n")
+
         with open('serversettings.txt', 'w') as f:
             for e in self.serverEntryValues:
                 if e.get() == "":

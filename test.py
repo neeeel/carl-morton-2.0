@@ -3,6 +3,8 @@ __author__ = 'neil'
 import window,texttospeech,decimal,betthread,time,myserversocket,threading,clientsocket
 import win32com.client,inputbox
 import logging
+import speechrecognition
+
 
 
 def get_IP():
@@ -92,13 +94,14 @@ def monitorMarketChange():
         #print(str(m) + " " +  str(current_market))
         if m !=current_market:
             selectedClothNo = 0
-            logging.info("market change detected in monitorMarketChange, new market is %l",m)
+            logging.info("market change detected in monitorMarketChange, new market is %s",str(m))
             tts.reset()
             current_market = ba.marketid
         time.sleep(1)
 
 def incrementClothNo():
     global ba,selection,selectedClothNo
+
     price_list = []
     prices = ba.getprices
     for p in prices:
@@ -109,6 +112,7 @@ def incrementClothNo():
     if price_list[0][1] < selectedClothNo:
         selectedClothNo = price_list[0][1]
     print("selected cloth no is",selectedClothNo)
+    print("in test, incrementing cloth no to",selectedClothNo)
 
 def decrementClothNo():
     global ba,selection,selectedClothNo
@@ -248,7 +252,7 @@ def speakPrice():
         repeat.start()
 
 def start_client():
-    global ip_address,clientSocket,w,botOn,fav, selection,tts,selectedClothNo
+    global ip_address,clientSocket,w,botOn,fav, selection,tts,selectedClothNo,processSaddleclothQueue
 
     print("is client socket set to NONE " ,clientSocket == None)
     if clientSocket != None:
@@ -259,6 +263,9 @@ def start_client():
         logging.info("Starting up client")
         if clientSocket == None:
             tts = texttospeech.TTS()
+            processSaddleclothQueue = True
+            process_change_of_saddlecloth_queue()
+
             logging.info("Started tts thread")
             clientSocket = clientsocket.ClientSocket()
             logging.info("started client socket")
@@ -270,6 +277,7 @@ def start_client():
             fav = ""
             selection = ""
             w.disableEntries()
+            w.client_running(True)
             selectedClothNo = 0
 
 def stop_client():
@@ -281,14 +289,46 @@ def stop_client():
         clientSocket.stop_client()
         clientSocket = None
         w.enableEntries()
+        w.client_running(False)
+        stop_processing_change_of_saddlecloth_queue()
         tts.kill()
         tts = None
+
+def start_speechrecognition_thread():
+    global speechrecognitionThread
+    if speechrecognitionThread is None:
+        speechrecognitionThread = threading.Thread(target=speechrecognition.speech_recognition_thread)
+        speechrecognitionThread.daemon = True
+        speechrecognitionThread.start()
+
+
+def stop_speechrecognition_thread():
+    global speechrecognitionThread
+    speechrecognition.stop_speech_recognition_thread()
+    speechrecognitionThread = None
+
+def process_change_of_saddlecloth_queue():
+    global selectedClothNo
+    if processSaddleclothQueue == True:
+        #print("checking saddlecloth queue")
+        next = speechrecognition.get_next_saddlecloth_selection()
+        #print("next spoken saddlecloth is",next)
+        if next != "":
+            if not tts is None:
+                selectedClothNo = next
+                tts.change_selection_via_speech(next)
+        threading.Timer(0.1, process_change_of_saddlecloth_queue).start()
+
+def stop_processing_change_of_saddlecloth_queue():
+    global processSaddleclothQueue
+    processSaddleclothQueue = False
 
 def logIn():
     x = inputbox.loginBox(w)
 
 
 keymap = []
+processSaddleclothQueue = False
 highLow = "low"
 ip_address = ""
 client_connected = False
@@ -305,11 +345,13 @@ clientSocket = None
 repeat = None
 tts = None
 logging.basicConfig(level=logging.INFO,filename = "log.txt",format='%(asctime)s %(message)s' , datefmt='%m/%d/%Y %I:%M:%S %p')
-ba = win32com.client.Dispatch("BettingAssistantCom.Application.ComClass")
+#ba = win32com.client.Dispatch("BettingAssistantCom.Application.ComClass")
+ba =win32com.client.dynamic.Dispatch("BettingAssistantCom.Application.ComClass")
 w = window.Window()
 current_market = ba.marketid
 settings = w.getClientBetSettings()
 my_bet_thread = betthread.betThread()
+speechrecognitionThread = None
 w.bind("<Key>",keyPress)
 ip_address = w.loadSettings()
 print("loaded ip address " ,ip_address)
@@ -320,4 +362,5 @@ w.bindClientFunctions("Connect",start_client)
 w.bindClientFunctions("Stop",stop_client)
 w.bindClientFunctions("Enter",get_IP)
 w.bindClientFunctions("Log In",logIn)
+start_speechrecognition_thread()
 w.mainloop()
